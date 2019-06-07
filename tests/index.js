@@ -5,15 +5,14 @@ const cache = new Client({
 	mongoURI: "mongodb://localhost:27017/dog-test",
 });
 
-console.log("Init cache");
+console.log("Start cache...");
 
-cache.on("ready", (v) => console.log("Cache is ready."));
 cache.on("debug", console.log);
 
 const DogSchema = new Schema(
 	{
 		_id: String,
-		name: String,
+		isCute: String,
 	},
 	{ versionKey: false, _id: false }
 );
@@ -23,4 +22,9 @@ const Dog = model("Dog", DogSchema);
 cache.model(Dog);
 cache.init();
 
-cache.set("Dog", "dog-1", "isBarking", "true");
+cache.on("ready", async (v) => {
+	console.log("Cache is ready.");
+	await cache.set("Dog", "dog-1", "isCute", "uwu");
+
+	cache.get("Dog", "dog-1", "isCute").then(console.log);
+});

@@ -21,15 +21,26 @@ class CacheClient extends events_1.EventEmitter {
      */
     async init() {
         this.redis = redis_1.createClient(this.options.redisOptions);
-        this.mongo = mongoose_1.createConnection(this.options.mongoURI, {
+        mongoose_1.connect(this.options.mongoURI, {
             useNewUrlParser: true,
         });
+        this.mongo = mongoose_1.connection;
         this.redis.on("error", (err) => this.emit("error", `[error][redis] ${err}`));
         this.redis.on("message", (ch, msg) => this.emit("debug", `[cache] [redis] ${ch} ${msg}`));
-        this.mongooseStatus = true;
-        this.redisStatus = true;
-        this.ready = true;
-        this.emit("ready");
+        this.redis.on("ready", () => {
+            this.redisStatus = true;
+            if (this.mongooseStatus) {
+                this.ready = true;
+                this.emit("ready");
+            }
+        });
+        this.mongo.on("open", () => {
+            if (this.redisStatus) {
+                this.ready = true;
+                this.emit("ready");
+            }
+            this.mongooseStatus = true;
+        });
     }
     /**
      * Makes a Mongoose model usable by the cacher
@@ -69,9 +80,9 @@ class CacheClient extends events_1.EventEmitter {
                     reject("Cannot connect to Mongoose.");
                 }
                 result = await this.getFromMongoose(type, hash, key);
-                resolve(result);
-                this.emit("debug", `[cache][query][get] ${result ? "SUCCESS" : "NO RESULT"} ${type} ${hash} ${key}, ${Date.now() - start}ms`);
             }
+            resolve(result);
+            this.emit("debug", `[cache][query][get] ${result ? "SUCCESS" : "NO RESULT"} ${type} ${hash} ${key}, ${Date.now() - start}ms`);
         });
     }
     /**
@@ -207,7 +218,7 @@ class CacheClient extends events_1.EventEmitter {
             }
             const model = this.models.get(modelName);
             const doc = await model.findOne({ _id: identifier });
-            return resolve(doc[field] || null);
+            return resolve(doc ? (doc[field] ? doc[field] : null) : null);
         });
     }
     /**
@@ -220,7 +231,7 @@ class CacheClient extends events_1.EventEmitter {
             if (this.modelNames.indexOf(modelName) === -1) {
                 throw Error(`Model "${modelName}" is unknown.`);
             }
-            if (!this.ready || !this.mongo) {
+            if (!this.mongooseStatus || !this.mongo) {
                 return reject("Not connected.");
             }
             const model = this.models.get(modelName);
@@ -240,18 +251,12 @@ class CacheClient extends events_1.EventEmitter {
             if (this.modelNames.indexOf(modelName) === -1) {
                 throw Error(`Model "${modelName}" is unknown.`);
             }
-            if (!this.ready || !this.mongo) {
+            if (!this.mongooseStatus || !this.mongo) {
                 return reject("Not connected.");
             }
             const model = this.models.get(modelName);
-            model.updateOne({ _id: identifier }, { [field]: value }, { upsert: true }, (err) => {
-                if (err) {
-                    reject(err);
-                }
-                else {
-                    resolve(true);
-                }
-            });
+            await model.updateOne({ _id: identifier }, { [field]: value }, { upsert: true });
+            resolve(true);
         });
     }
 }

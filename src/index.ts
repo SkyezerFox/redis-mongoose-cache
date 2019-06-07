@@ -1,7 +1,8 @@
 import { EventEmitter } from "events";
 import {
+	connect,
+	connection,
 	Connection as MongooseConnection,
-	createConnection,
 	Model,
 } from "mongoose";
 import {
@@ -49,9 +50,14 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 	public async init() {
 		this.redis = createClient(this.options.redisOptions);
 
-		this.mongo = createConnection(this.options.mongoURI, {
-			useNewUrlParser: true,
-		});
+		connect(
+			this.options.mongoURI,
+			{
+				useNewUrlParser: true,
+			},
+		);
+
+		this.mongo = connection;
 
 		this.redis.on("error", (err) =>
 			this.emit("error", `[error][redis] ${err}`),
@@ -61,10 +67,21 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			this.emit("debug", `[cache] [redis] ${ch} ${msg}`),
 		);
 
-		this.mongooseStatus = true;
-		this.redisStatus = true;
-		this.ready = true;
-		this.emit("ready");
+		this.redis.on("ready", () => {
+			this.redisStatus = true;
+			if (this.mongooseStatus) {
+				this.ready = true;
+				this.emit("ready");
+			}
+		});
+
+		this.mongo.on("open", () => {
+			if (this.redisStatus) {
+				this.ready = true;
+				this.emit("ready");
+			}
+			this.mongooseStatus = true;
+		});
 	}
 
 	/**
@@ -114,16 +131,17 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 				if (!this.mongooseStatus) {
 					reject("Cannot connect to Mongoose.");
 				}
-				result = await this.getFromMongoose(type, hash, key);
 
-				resolve(result);
-				this.emit(
-					"debug",
-					`[cache][query][get] ${
-						result ? "SUCCESS" : "NO RESULT"
-					} ${type} ${hash} ${key}, ${Date.now() - start}ms`,
-				);
+				result = await this.getFromMongoose(type, hash, key);
 			}
+
+			resolve(result);
+			this.emit(
+				"debug",
+				`[cache][query][get] ${
+					result ? "SUCCESS" : "NO RESULT"
+				} ${type} ${hash} ${key}, ${Date.now() - start}ms`,
+			);
 		});
 	}
 
@@ -294,7 +312,7 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 			const model = this.models.get(modelName) as Model<any>;
 			const doc = await model.findOne({ _id: identifier });
-			return resolve(doc[field] || null);
+			return resolve(doc ? (doc[field] ? doc[field] : null) : null);
 		});
 	}
 
@@ -311,7 +329,7 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			if (this.modelNames.indexOf(modelName) === -1) {
 				throw Error(`Model "${modelName}" is unknown.`);
 			}
-			if (!this.ready || !this.mongo) {
+			if (!this.mongooseStatus || !this.mongo) {
 				return reject("Not connected.");
 			}
 
@@ -338,24 +356,18 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			if (this.modelNames.indexOf(modelName) === -1) {
 				throw Error(`Model "${modelName}" is unknown.`);
 			}
-			if (!this.ready || !this.mongo) {
+			if (!this.mongooseStatus || !this.mongo) {
 				return reject("Not connected.");
 			}
 
 			const model = this.models.get(modelName) as Model<any>;
 
-			model.updateOne(
+			await model.updateOne(
 				{ _id: identifier },
 				{ [field]: value },
 				{ upsert: true },
-				(err) => {
-					if (err) {
-						reject(err);
-					} else {
-						resolve(true);
-					}
-				},
 			);
+			resolve(true);
 		});
 	}
 }
