@@ -1,4 +1,4 @@
-# redis-mongoose-cache - Thing for caching with Redis and MongoDB
+# redis-mongoose-cache - Thing for caching things with Redis and MongoDB
 
 ## Usage
 
