@@ -12,7 +12,7 @@ cache.on("debug", console.log);
 const DogSchema = new Schema(
 	{
 		_id: String,
-		isCute: String,
+		isCute: Boolean,
 	},
 	{ versionKey: false, _id: false }
 );
@@ -24,7 +24,7 @@ cache.init();
 
 cache.on("ready", async (v) => {
 	console.log("Cache is ready.");
-	await cache.set("Dog", "dog-1", "isCute", "uwu");
+	await cache.set("Dog", "dog-1", "isCute", "true");
 
 	cache.get("Dog", "dog-1", "isCute").then(console.log);
 });

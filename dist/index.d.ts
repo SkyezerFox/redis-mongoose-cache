@@ -88,6 +88,7 @@ export declare class CacheClient<ModelType extends string> extends EventEmitter 
      * @param {string} value The value to set the field to
      */
     private setMongoose;
+    private mongooseCastCheck;
 }
 export {};
 /**

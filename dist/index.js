@@ -235,7 +235,7 @@ class CacheClient extends events_1.EventEmitter {
                 return reject("Not connected.");
             }
             const model = this.models.get(modelName);
-            const doc = await model.findOne({ _id: identifier });
+            const doc = (await model.findOne({ _id: identifier }));
             return resolve(doc);
         });
     }
@@ -255,9 +255,29 @@ class CacheClient extends events_1.EventEmitter {
                 return reject("Not connected.");
             }
             const model = this.models.get(modelName);
-            await model.updateOne({ _id: identifier }, { [field]: value }, { upsert: true });
+            this.mongooseCastCheck(model, field, value);
+            await model.updateOne({ _id: identifier }, { [field]: JSON.parse(value) }, { upsert: true });
             resolve(true);
         });
+    }
+    mongooseCastCheck(model, fieldName, value) {
+        if (!model.schema.path(fieldName)) {
+            throw Error(`Schema for model ${model.modelName} does not have a definition for the field "${fieldName}".`);
+        }
+        try {
+            value = JSON.parse(value);
+        }
+        catch (err) {
+            value = value;
+        }
+        if (typeof value !==
+            // @ts-ignore
+            model.schema.path(fieldName).instance.toLowerCase()) {
+            throw Error(`Value ${value} is not of the type "${model.schema
+                .path(fieldName)
+                // @ts-ignore
+                .instance.toLowerCase()}" required by the field "${fieldName}" on the model "${model.modelName}".`);
+        }
     }
 }
 exports.CacheClient = CacheClient;

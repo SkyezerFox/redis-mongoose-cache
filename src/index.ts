@@ -3,6 +3,7 @@ import {
 	connect,
 	connection,
 	Connection as MongooseConnection,
+	Document,
 	Model,
 } from "mongoose";
 import {
@@ -334,7 +335,7 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			}
 
 			const model = this.models.get(modelName) as Model<any>;
-			const doc = await model.findOne({ _id: identifier });
+			const doc = (await model.findOne({ _id: identifier })) as Document;
 			return resolve(doc);
 		});
 	}
@@ -361,14 +362,50 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			}
 
 			const model = this.models.get(modelName) as Model<any>;
+			this.mongooseCastCheck(model, field, value);
 
 			await model.updateOne(
 				{ _id: identifier },
-				{ [field]: value },
+				{ [field]: JSON.parse(value) },
 				{ upsert: true },
 			);
 			resolve(true);
 		});
+	}
+
+	private mongooseCastCheck(
+		model: Model<any>,
+		fieldName: string,
+		value: any,
+	) {
+		if (!model.schema.path(fieldName)) {
+			throw Error(
+				`Schema for model ${
+					model.modelName
+				} does not have a definition for the field "${fieldName}".`,
+			);
+		}
+
+		try {
+			value = JSON.parse(value);
+		} catch (err) {
+			value = value;
+		}
+
+		if (
+			typeof value !==
+			// @ts-ignore
+			model.schema.path(fieldName).instance.toLowerCase()
+		) {
+			throw Error(
+				`Value ${value} is not of the type "${model.schema
+					.path(fieldName)
+					// @ts-ignore
+					.instance.toLowerCase()}" required by the field "${fieldName}" on the model "${
+					model.modelName
+				}".`,
+			);
+		}
 	}
 }
 
