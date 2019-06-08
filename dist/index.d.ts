@@ -8,10 +8,14 @@ interface CacheClientOptions {
 /**
  * Class for creating a Redis/MongoDB cache
  */
-export declare class CacheClient<ModelType extends string> extends EventEmitter {
+export declare class CacheClient<Models extends {
+    [x: string]: {
+        [x: string]: any;
+    };
+}> extends EventEmitter {
     options: CacheClientOptions;
-    models: Map<ModelType, Model<any>>;
-    modelNames: ModelType[];
+    models: Map<keyof Models, Model<any>>;
+    modelNames: string[];
     ready: boolean;
     redisStatus: boolean;
     mongooseStatus: boolean;
@@ -30,25 +34,25 @@ export declare class CacheClient<ModelType extends string> extends EventEmitter 
     model(...models: Array<Model<any>>): this;
     /**
      * Gets a value from the cache
-     * @param {ModelType} type The name of the model to use when accessing MongoDB
+     * @param {Models} type The name of the model to use when accessing MongoDB
      * @param {string} hash The hash field to use
      * @param {string} key The key to get from the field
      */
-    get(type: ModelType, hash: string, key: string): Promise<string | null>;
+    get<M extends keyof Models, K extends keyof Models[M]>(type: M, hash: string, key: K): Promise<string | null>;
     /**
      * Gets all keys from a hash
-     * @param {ModelType} type
+     * @param {keyof Models} type
      * @param {string} hash
      */
-    getAll(type: ModelType, hash: string): Promise<object | null>;
+    getAll<M extends keyof Models>(type: M, hash: string): Promise<object | null>;
     /**
      * Sets a value in the cache
-     * @param {ModelType} type The name of the model to use when accessing MongoDB
+     * @param {keyof Models} type The name of the model to use when accessing MongoDB
      * @param {string} hash The hash field to use
      * @param {string} key The key to get from the field
      * @param {string} value The value to store
      */
-    set(type: ModelType, hash: string, key: string, value: string): Promise<boolean>;
+    set<M extends keyof Models, K extends keyof Models[M], V extends Models[M][K]>(type: M, hash: string, key: K, value: V): Promise<boolean>;
     /**
      * Gets a value from the Redis cache
      * @param {string} key Key to use
@@ -69,7 +73,7 @@ export declare class CacheClient<ModelType extends string> extends EventEmitter 
     private setToRedis;
     /**
      * Gets a value from MongoDB
-     * @param {ModelType} modelName The model to use
+     * @param {Models} modelName The model to use
      * @param {string} identifier Identifier to use
      * @param {string} field Field to return
      */
@@ -82,7 +86,7 @@ export declare class CacheClient<ModelType extends string> extends EventEmitter 
     private getAllFromMongoose;
     /**
      *
-     * @param {ModelType} modelName Name of the model to use
+     * @param {Models} modelName Name of the model to use
      * @param {string} identifier Identifier to use when saving the document
      * @param {string} field The field to set
      * @param {string} value The value to set the field to

@@ -26,5 +26,5 @@ cache.on("ready", async (v) => {
 	console.log("Cache is ready.");
 	await cache.set("Dog", "dog-1", "isCute", "true");
 
-	cache.get("Dog", "dog-1", "isCute").then(console.log);
+	// cache.get("Dog", "dog-1", "isCute").then(console.log);
 });

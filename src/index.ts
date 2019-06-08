@@ -20,11 +20,15 @@ interface CacheClientOptions {
 /**
  * Class for creating a Redis/MongoDB cache
  */
-export class CacheClient<ModelType extends string> extends EventEmitter {
+export class CacheClient<
+	Models extends {
+		[x: string]: { [x: string]: any };
+	}
+> extends EventEmitter {
 	public options: CacheClientOptions;
 
-	public models: Map<ModelType, Model<any>>;
-	public modelNames: ModelType[];
+	public models: Map<keyof Models, Model<any>>;
+	public modelNames: string[];
 
 	public ready: boolean;
 	public redisStatus: boolean;
@@ -48,7 +52,7 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 	/**
 	 * @fires ready
 	 */
-	public async init() {
+	public init(): Promise<void> {
 		this.redis = createClient(this.options.redisOptions);
 
 		connect(
@@ -68,20 +72,27 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			this.emit("debug", `[cache] [redis] ${ch} ${msg}`),
 		);
 
-		this.redis.on("ready", () => {
-			this.redisStatus = true;
-			if (this.mongooseStatus) {
-				this.ready = true;
-				this.emit("ready");
+		return new Promise((resolve, reject) => {
+			if (!this.redis || !this.mongo) {
+				return reject();
 			}
-		});
+			this.redis.on("ready", () => {
+				this.redisStatus = true;
+				if (this.mongooseStatus) {
+					this.ready = true;
+					this.emit("ready");
+					resolve();
+				}
+			});
 
-		this.mongo.on("open", () => {
-			if (this.redisStatus) {
-				this.ready = true;
-				this.emit("ready");
-			}
-			this.mongooseStatus = true;
+			this.mongo.on("open", () => {
+				this.mongooseStatus = true;
+				if (this.redisStatus) {
+					this.ready = true;
+					this.emit("ready");
+					resolve();
+				}
+			});
 		});
 	}
 
@@ -92,8 +103,8 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 	 */
 	public model(...models: Array<Model<any>>): this {
 		models.forEach((model) => {
-			this.models.set(model.modelName as ModelType, model);
-			this.modelNames.push(model.modelName as ModelType);
+			this.models.set(model.modelName, model);
+			this.modelNames.push(model.modelName);
 		});
 
 		this.emit("debug", `[cache] added ${models.length} models`);
@@ -105,18 +116,18 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 	/**
 	 * Gets a value from the cache
-	 * @param {ModelType} type The name of the model to use when accessing MongoDB
+	 * @param {Models} type The name of the model to use when accessing MongoDB
 	 * @param {string} hash The hash field to use
 	 * @param {string} key The key to get from the field
 	 */
-	public get(
-		type: ModelType,
+	public get<M extends keyof Models, K extends keyof Models[M]>(
+		type: M,
 		hash: string,
-		key: string,
+		key: K,
 	): Promise<string | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(type) === -1) {
+			if (this.modelNames.indexOf(type as string) === -1) {
 				return reject(`Model "${type}" is unknown.`);
 			}
 
@@ -125,7 +136,7 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			}
 			let result = null;
 			if (this.redisStatus) {
-				result = await this.getFromRedis(hash, key);
+				result = await this.getFromRedis(hash, key as string);
 			}
 
 			if (!result) {
@@ -133,7 +144,11 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 					reject("Cannot connect to Mongoose.");
 				}
 
-				result = await this.getFromMongoose(type, hash, key);
+				result = await this.getFromMongoose(
+					type as string,
+					hash,
+					key as string,
+				);
 			}
 
 			resolve(result);
@@ -148,13 +163,16 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 	/**
 	 * Gets all keys from a hash
-	 * @param {ModelType} type
+	 * @param {keyof Models} type
 	 * @param {string} hash
 	 */
-	public getAll(type: ModelType, hash: string): Promise<object | null> {
+	public getAll<M extends keyof Models>(
+		type: M,
+		hash: string,
+	): Promise<object | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(type) === -1) {
+			if (this.modelNames.indexOf(type as string) === -1) {
 				return reject(`Model "${type}" is unknown.`);
 			}
 
@@ -185,20 +203,19 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 	/**
 	 * Sets a value in the cache
-	 * @param {ModelType} type The name of the model to use when accessing MongoDB
+	 * @param {keyof Models} type The name of the model to use when accessing MongoDB
 	 * @param {string} hash The hash field to use
 	 * @param {string} key The key to get from the field
 	 * @param {string} value The value to store
 	 */
-	public set(
-		type: ModelType,
-		hash: string,
-		key: string,
-		value: string,
-	): Promise<boolean> {
+	public set<
+		M extends keyof Models,
+		K extends keyof Models[M],
+		V extends Models[M][K]
+	>(type: M, hash: string, key: K, value: V): Promise<boolean> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(type) === -1) {
+			if (this.modelNames.indexOf(type as string) === -1) {
 				return reject(`Model "${type}" is unknown.`);
 			}
 
@@ -207,13 +224,18 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 			}
 
 			if (this.redisStatus) {
-				await this.setToRedis(hash, key, value);
+				await this.setToRedis(hash, key as string, value);
 			}
 
 			if (!this.mongooseStatus) {
 				reject("Cannot connect to Mongoose.");
 			}
-			const result = await this.setMongoose(type, hash, key, value);
+			const result = await this.setMongoose(
+				type,
+				hash,
+				key as string,
+				value,
+			);
 			resolve(result);
 			this.emit(
 				"debug",
@@ -294,17 +316,17 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 	/**
 	 * Gets a value from MongoDB
-	 * @param {ModelType} modelName The model to use
+	 * @param {Models} modelName The model to use
 	 * @param {string} identifier Identifier to use
 	 * @param {string} field Field to return
 	 */
 	private getFromMongoose(
-		modelName: ModelType,
+		modelName: keyof Models,
 		identifier: string,
 		field: string,
 	): Promise<string | null> {
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(modelName) === -1) {
+			if (this.modelNames.indexOf(modelName as string) === -1) {
 				throw Error(`Model "${modelName}" is unknown.`);
 			}
 			if (!this.ready || !this.mongo) {
@@ -323,11 +345,11 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 	 * @param {string} identifier The identifier to use when saving the document
 	 */
 	private getAllFromMongoose(
-		modelName: ModelType,
+		modelName: keyof Models,
 		identifier: string,
 	): Promise<object | null> {
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(modelName) === -1) {
+			if (this.modelNames.indexOf(modelName as string) === -1) {
 				throw Error(`Model "${modelName}" is unknown.`);
 			}
 			if (!this.mongooseStatus || !this.mongo) {
@@ -342,19 +364,19 @@ export class CacheClient<ModelType extends string> extends EventEmitter {
 
 	/**
 	 *
-	 * @param {ModelType} modelName Name of the model to use
+	 * @param {Models} modelName Name of the model to use
 	 * @param {string} identifier Identifier to use when saving the document
 	 * @param {string} field The field to set
 	 * @param {string} value The value to set the field to
 	 */
 	private setMongoose(
-		modelName: ModelType,
+		modelName: keyof Models,
 		identifier: string,
 		field: string,
 		value: string,
 	): Promise<boolean> {
 		return new Promise(async (resolve, reject) => {
-			if (this.modelNames.indexOf(modelName) === -1) {
+			if (this.modelNames.indexOf(modelName as string) === -1) {
 				throw Error(`Model "${modelName}" is unknown.`);
 			}
 			if (!this.mongooseStatus || !this.mongo) {

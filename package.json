@@ -1,7 +1,7 @@
 {
 	"name": "redis-mongoose-cache",
 	"description": "Thing for caching things with Redis and MongoDB",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"author": {
 		"email": "ori@oridev.uk",
 		"name": "sparklfox",

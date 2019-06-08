@@ -19,7 +19,7 @@ class CacheClient extends events_1.EventEmitter {
     /**
      * @fires ready
      */
-    async init() {
+    init() {
         this.redis = redis_1.createClient(this.options.redisOptions);
         mongoose_1.connect(this.options.mongoURI, {
             useNewUrlParser: true,
@@ -27,19 +27,26 @@ class CacheClient extends events_1.EventEmitter {
         this.mongo = mongoose_1.connection;
         this.redis.on("error", (err) => this.emit("error", `[error][redis] ${err}`));
         this.redis.on("message", (ch, msg) => this.emit("debug", `[cache] [redis] ${ch} ${msg}`));
-        this.redis.on("ready", () => {
-            this.redisStatus = true;
-            if (this.mongooseStatus) {
-                this.ready = true;
-                this.emit("ready");
+        return new Promise((resolve, reject) => {
+            if (!this.redis || !this.mongo) {
+                return reject();
             }
-        });
-        this.mongo.on("open", () => {
-            if (this.redisStatus) {
-                this.ready = true;
-                this.emit("ready");
-            }
-            this.mongooseStatus = true;
+            this.redis.on("ready", () => {
+                this.redisStatus = true;
+                if (this.mongooseStatus) {
+                    this.ready = true;
+                    this.emit("ready");
+                    resolve();
+                }
+            });
+            this.mongo.on("open", () => {
+                this.mongooseStatus = true;
+                if (this.redisStatus) {
+                    this.ready = true;
+                    this.emit("ready");
+                    resolve();
+                }
+            });
         });
     }
     /**
@@ -58,7 +65,7 @@ class CacheClient extends events_1.EventEmitter {
     // CACHE METHODS
     /**
      * Gets a value from the cache
-     * @param {ModelType} type The name of the model to use when accessing MongoDB
+     * @param {Models} type The name of the model to use when accessing MongoDB
      * @param {string} hash The hash field to use
      * @param {string} key The key to get from the field
      */
@@ -87,7 +94,7 @@ class CacheClient extends events_1.EventEmitter {
     }
     /**
      * Gets all keys from a hash
-     * @param {ModelType} type
+     * @param {keyof Models} type
      * @param {string} hash
      */
     getAll(type, hash) {
@@ -115,7 +122,7 @@ class CacheClient extends events_1.EventEmitter {
     }
     /**
      * Sets a value in the cache
-     * @param {ModelType} type The name of the model to use when accessing MongoDB
+     * @param {keyof Models} type The name of the model to use when accessing MongoDB
      * @param {string} hash The hash field to use
      * @param {string} key The key to get from the field
      * @param {string} value The value to store
@@ -204,7 +211,7 @@ class CacheClient extends events_1.EventEmitter {
     // MONGOOSE METHODS
     /**
      * Gets a value from MongoDB
-     * @param {ModelType} modelName The model to use
+     * @param {Models} modelName The model to use
      * @param {string} identifier Identifier to use
      * @param {string} field Field to return
      */
@@ -241,7 +248,7 @@ class CacheClient extends events_1.EventEmitter {
     }
     /**
      *
-     * @param {ModelType} modelName Name of the model to use
+     * @param {Models} modelName Name of the model to use
      * @param {string} identifier Identifier to use when saving the document
      * @param {string} field The field to set
      * @param {string} value The value to set the field to
