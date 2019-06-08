@@ -38,7 +38,7 @@ export declare class CacheClient<Models extends {
      * @param {string} hash The hash field to use
      * @param {string} key The key to get from the field
      */
-    get<M extends keyof Models, K extends keyof Models[M]>(type: M, hash: string, key: K): Promise<string | null>;
+    get<M extends keyof Models, K extends keyof Models[M]>(type: M, hash: string, key: K): Promise<any | null>;
     /**
      * Gets all keys from a hash
      * @param {keyof Models} type

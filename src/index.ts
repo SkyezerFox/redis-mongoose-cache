@@ -1,16 +1,6 @@
 import { EventEmitter } from "events";
-import {
-	connect,
-	connection,
-	Connection as MongooseConnection,
-	Document,
-	Model,
-} from "mongoose";
-import {
-	ClientOpts as RedisClientOptions,
-	createClient,
-	RedisClient,
-} from "redis";
+import { Connection as MongooseConnection, createConnection, Document, Model } from "mongoose";
+import { ClientOpts as RedisClientOptions, createClient, RedisClient } from "redis";
 
 interface CacheClientOptions {
 	redisOptions?: RedisClientOptions;
@@ -55,14 +45,9 @@ export class CacheClient<
 	public init(): Promise<void> {
 		this.redis = createClient(this.options.redisOptions);
 
-		connect(
-			this.options.mongoURI,
-			{
-				useNewUrlParser: true,
-			},
-		);
-
-		this.mongo = connection;
+		this.mongo = createConnection(this.options.mongoURI, {
+			useNewUrlParser: true,
+		});
 
 		this.redis.on("error", (err) =>
 			this.emit("error", `[error][redis] ${err}`),
@@ -102,12 +87,23 @@ export class CacheClient<
 	 * @returns {CacheClient} CacheClient
 	 */
 	public model(...models: Array<Model<any>>): this {
-		models.forEach((model) => {
-			this.models.set(model.modelName, model);
-			this.modelNames.push(model.modelName);
-		});
+		this.once("ready", () => {
+			if (!this.mongo) {
+				throw Error("Ready event emmitted but cache not ready!");
+			}
+			models.forEach((model) => {
+				if (!this.mongo) {
+					throw Error("Ready event emmitted but cache not ready!");
+				}
+				this.models.set(
+					model.modelName,
+					this.mongo.model(model.modelName, model.schema),
+				);
+				this.modelNames.push(model.modelName);
+			});
 
-		this.emit("debug", `[cache] added ${models.length} models`);
+			this.emit("debug", `[cache] added ${models.length} models`);
+		});
 
 		return this;
 	}

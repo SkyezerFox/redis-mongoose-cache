@@ -21,10 +21,9 @@ class CacheClient extends events_1.EventEmitter {
      */
     init() {
         this.redis = redis_1.createClient(this.options.redisOptions);
-        mongoose_1.connect(this.options.mongoURI, {
+        this.mongo = mongoose_1.createConnection(this.options.mongoURI, {
             useNewUrlParser: true,
         });
-        this.mongo = mongoose_1.connection;
         this.redis.on("error", (err) => this.emit("error", `[error][redis] ${err}`));
         this.redis.on("message", (ch, msg) => this.emit("debug", `[cache] [redis] ${ch} ${msg}`));
         return new Promise((resolve, reject) => {
@@ -55,11 +54,19 @@ class CacheClient extends events_1.EventEmitter {
      * @returns {CacheClient} CacheClient
      */
     model(...models) {
-        models.forEach((model) => {
-            this.models.set(model.modelName, model);
-            this.modelNames.push(model.modelName);
+        this.once("ready", () => {
+            if (!this.mongo) {
+                throw Error("Ready event emmitted but cache not ready!");
+            }
+            models.forEach((model) => {
+                if (!this.mongo) {
+                    throw Error("Ready event emmitted but cache not ready!");
+                }
+                this.models.set(model.modelName, this.mongo.model(model.modelName, model.schema));
+                this.modelNames.push(model.modelName);
+            });
+            this.emit("debug", `[cache] added ${models.length} models`);
         });
-        this.emit("debug", `[cache] added ${models.length} models`);
         return this;
     }
     // CACHE METHODS
@@ -87,6 +94,12 @@ class CacheClient extends events_1.EventEmitter {
                     reject("Cannot connect to Mongoose.");
                 }
                 result = await this.getFromMongoose(type, hash, key);
+                if (result) {
+                    this.setToRedis(hash, key, this.stringify(result));
+                }
+            }
+            else {
+                result = this.parse(result);
             }
             resolve(result);
             this.emit("debug", `[cache][query][get] ${result ? "SUCCESS" : "NO RESULT"} ${type} ${hash} ${key}, ${Date.now() - start}ms`);
@@ -115,9 +128,12 @@ class CacheClient extends events_1.EventEmitter {
                     reject("Cannot connect to Mongoose.");
                 }
                 result = await this.getAllFromMongoose(type, hash);
-                resolve(result);
-                this.emit("debug", `[cache][query][getAll] ${result ? "SUCCESS" : "NO RESULT"} ${type} ${hash}, ${Date.now() - start}ms`);
             }
+            else {
+                result = this.parse(result);
+            }
+            resolve(result);
+            this.emit("debug", `[cache][query][getAll] ${result ? "SUCCESS" : "NO RESULT"} ${type} ${hash}, ${Date.now() - start}ms`);
         });
     }
     /**
@@ -137,7 +153,7 @@ class CacheClient extends events_1.EventEmitter {
                 reject("Client is not connected.");
             }
             if (this.redisStatus) {
-                await this.setToRedis(hash, key, value);
+                await this.setToRedis(hash, key, this.stringify(value));
             }
             if (!this.mongooseStatus) {
                 reject("Cannot connect to Mongoose.");
@@ -263,7 +279,7 @@ class CacheClient extends events_1.EventEmitter {
             }
             const model = this.models.get(modelName);
             this.mongooseCastCheck(model, field, value);
-            await model.updateOne({ _id: identifier }, { [field]: JSON.parse(value) }, { upsert: true });
+            await model.updateOne({ _id: identifier }, { [field]: this.parse(value) }, { upsert: true });
             resolve(true);
         });
     }
@@ -271,12 +287,7 @@ class CacheClient extends events_1.EventEmitter {
         if (!model.schema.path(fieldName)) {
             throw Error(`Schema for model ${model.modelName} does not have a definition for the field "${fieldName}".`);
         }
-        try {
-            value = JSON.parse(value);
-        }
-        catch (err) {
-            value = value;
-        }
+        value = this.parse(value);
         if (typeof value !==
             // @ts-ignore
             model.schema.path(fieldName).instance.toLowerCase()) {
@@ -293,12 +304,17 @@ class CacheClient extends events_1.EventEmitter {
         return JSON.parse(data);
     }
     parse(data) {
-        try {
-            return JSON.parse(data);
+        if (typeof data === "string") {
+            try {
+                return JSON.parse(data);
+            }
+            catch (err) {
+                return data;
+            }
         }
-        catch (err) {
-            return data;
-        }
+        const values = [];
+        Object.keys(data).map((v) => (values[v] = this.parse(data[v])));
+        return values;
     }
 }
 exports.CacheClient = CacheClient;
