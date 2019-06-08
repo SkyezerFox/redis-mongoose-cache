@@ -31,7 +31,7 @@ class CacheClient extends events_1.EventEmitter {
             if (!this.redis || !this.mongo) {
                 return reject();
             }
-            this.redis.on("ready", () => {
+            this.redis.once("ready", () => {
                 this.redisStatus = true;
                 if (this.mongooseStatus) {
                     this.ready = true;
@@ -39,7 +39,7 @@ class CacheClient extends events_1.EventEmitter {
                     resolve();
                 }
             });
-            this.mongo.on("open", () => {
+            this.mongo.once("open", () => {
                 this.mongooseStatus = true;
                 if (this.redisStatus) {
                     this.ready = true;
@@ -284,6 +284,20 @@ class CacheClient extends events_1.EventEmitter {
                 .path(fieldName)
                 // @ts-ignore
                 .instance.toLowerCase()}" required by the field "${fieldName}" on the model "${model.modelName}".`);
+        }
+    }
+    stringify(data) {
+        if (typeof data === "string") {
+            return data;
+        }
+        return JSON.parse(data);
+    }
+    parse(data) {
+        try {
+            return JSON.parse(data);
+        }
+        catch (err) {
+            return data;
         }
     }
 }

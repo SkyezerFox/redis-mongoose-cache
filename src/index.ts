@@ -76,7 +76,7 @@ export class CacheClient<
 			if (!this.redis || !this.mongo) {
 				return reject();
 			}
-			this.redis.on("ready", () => {
+			this.redis.once("ready", () => {
 				this.redisStatus = true;
 				if (this.mongooseStatus) {
 					this.ready = true;
@@ -85,7 +85,7 @@ export class CacheClient<
 				}
 			});
 
-			this.mongo.on("open", () => {
+			this.mongo.once("open", () => {
 				this.mongooseStatus = true;
 				if (this.redisStatus) {
 					this.ready = true;
@@ -124,7 +124,7 @@ export class CacheClient<
 		type: M,
 		hash: string,
 		key: K,
-	): Promise<string | null> {
+	): Promise<any | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
 			if (this.modelNames.indexOf(type as string) === -1) {
@@ -149,6 +149,16 @@ export class CacheClient<
 					hash,
 					key as string,
 				);
+
+				if (result) {
+					this.setToRedis(
+						hash,
+						key as string,
+						this.stringify(result),
+					);
+				}
+			} else {
+				result = this.parse(result);
 			}
 
 			resolve(result);
@@ -189,15 +199,17 @@ export class CacheClient<
 					reject("Cannot connect to Mongoose.");
 				}
 				result = await this.getAllFromMongoose(type, hash);
-
-				resolve(result);
-				this.emit(
-					"debug",
-					`[cache][query][getAll] ${
-						result ? "SUCCESS" : "NO RESULT"
-					} ${type} ${hash}, ${Date.now() - start}ms`,
-				);
+			} else {
+				result = this.parse(result as { [x: string]: string });
 			}
+
+			resolve(result);
+			this.emit(
+				"debug",
+				`[cache][query][getAll] ${
+					result ? "SUCCESS" : "NO RESULT"
+				} ${type} ${hash}, ${Date.now() - start}ms`,
+			);
 		});
 	}
 
@@ -224,7 +236,11 @@ export class CacheClient<
 			}
 
 			if (this.redisStatus) {
-				await this.setToRedis(hash, key as string, value);
+				await this.setToRedis(
+					hash,
+					key as string,
+					this.stringify(value),
+				);
 			}
 
 			if (!this.mongooseStatus) {
@@ -388,7 +404,7 @@ export class CacheClient<
 
 			await model.updateOne(
 				{ _id: identifier },
-				{ [field]: JSON.parse(value) },
+				{ [field]: this.parse(value) },
 				{ upsert: true },
 			);
 			resolve(true);
@@ -408,11 +424,7 @@ export class CacheClient<
 			);
 		}
 
-		try {
-			value = JSON.parse(value);
-		} catch (err) {
-			value = value;
-		}
+		value = this.parse(value);
 
 		if (
 			typeof value !==
@@ -428,6 +440,28 @@ export class CacheClient<
 				}".`,
 			);
 		}
+	}
+
+	private stringify(data: any) {
+		if (typeof data === "string") {
+			return data;
+		}
+
+		return JSON.parse(data);
+	}
+
+	private parse(data: string | { [x: string]: string }) {
+		if (typeof data === "string") {
+			try {
+				return JSON.parse(data);
+			} catch (err) {
+				return data;
+			}
+		}
+
+		const values: string[] = [];
+		Object.keys(data).map((v) => (values[v as any] = this.parse(data[v])));
+		return values;
 	}
 }
 

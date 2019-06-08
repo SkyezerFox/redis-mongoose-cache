@@ -93,6 +93,8 @@ export declare class CacheClient<Models extends {
      */
     private setMongoose;
     private mongooseCastCheck;
+    private stringify;
+    private parse;
 }
 export {};
 /**
