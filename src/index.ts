@@ -1,6 +1,15 @@
 import { EventEmitter } from "events";
-import { Connection as MongooseConnection, createConnection, Document, Model } from "mongoose";
-import { ClientOpts as RedisClientOptions, createClient, RedisClient } from "redis";
+import {
+	Connection as MongooseConnection,
+	createConnection,
+	Document,
+	Model,
+} from "mongoose";
+import {
+	ClientOpts as RedisClientOptions,
+	createClient,
+	RedisClient,
+} from "redis";
 
 interface CacheClientOptions {
 	redisOptions?: RedisClientOptions;
@@ -175,7 +184,7 @@ export class CacheClient<
 	public getAll<M extends keyof Models>(
 		type: M,
 		hash: string,
-	): Promise<object | null> {
+	): Promise<Models[M] | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
 			if (this.modelNames.indexOf(type as string) === -1) {
