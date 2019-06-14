@@ -128,7 +128,7 @@ export class CacheClient<
 	public get<M extends keyof Models, K extends keyof Models[M]>(
 		type: M,
 		hash: string,
-		key: K,
+		key?: K,
 	): Promise<any | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
@@ -140,6 +140,11 @@ export class CacheClient<
 				reject("Client is not connected.");
 			}
 			let result = null;
+			
+			if (!key) {
+				return this.getAll(type, hash);	
+			}
+			
 			if (this.redisStatus) {
 				result = await this.getFromRedis(hash, key as string);
 			}
