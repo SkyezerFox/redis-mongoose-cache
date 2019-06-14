@@ -83,6 +83,14 @@ cache.model(Dog, Cat, Fish);
   cache.set(modelName: string, key: string, field: string, value: any): Promise<boolean>
   ```
 
+- `init` - Initialises the cache, connecting it to both Redis and MongoDB
+
+- `model` - Adds a Mongoose model to the cache for it to use for method validation/access to Mongo
+
+  ```ts
+  cache.model(models: ...Mongoose.Model<any>[])
+  ```
+
 **get**
 
 ```js
@@ -97,7 +105,7 @@ cache.get("Dog", "1234", "name")
 cache.getAll("Dog", "1234")
 
 /* Example Response: { 
-    name: "Sir Woofalot The Third", 
+    name: "Sir Woofalot The 3rd", 
     isBarking: false
 } */
 ```
