@@ -107,8 +107,8 @@ class CacheClient extends events_1.EventEmitter {
     }
     /**
      * Gets all keys from a hash
-     * @param {keyof Models} type
-     * @param {string} hash
+     * @param {keyof Models} type Model to use
+     * @param {string} hash Hash
      */
     getAll(type, hash) {
         const start = Date.now();

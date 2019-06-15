@@ -183,8 +183,8 @@ export class CacheClient<
 
 	/**
 	 * Gets all keys from a hash
-	 * @param {keyof Models} type
-	 * @param {string} hash
+	 * @param {keyof Models} type Model to use
+	 * @param {string} hash Hash
 	 */
 	public getAll<M extends keyof Models>(
 		type: M,

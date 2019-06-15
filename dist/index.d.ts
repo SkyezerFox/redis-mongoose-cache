@@ -41,10 +41,10 @@ export declare class CacheClient<Models extends {
     get<M extends keyof Models, K extends keyof Models[M]>(type: M, hash: string, key: K): Promise<any | null>;
     /**
      * Gets all keys from a hash
-     * @param {keyof Models} type
-     * @param {string} hash
+     * @param {keyof Models} type Model to use
+     * @param {string} hash Hash
      */
-    getAll<M extends keyof Models>(type: M, hash: string): Promise<object | null>;
+    getAll<M extends keyof Models>(type: M, hash: string): Promise<Models[M] | null>;
     /**
      * Sets a value in the cache
      * @param {keyof Models} type The name of the model to use when accessing MongoDB
