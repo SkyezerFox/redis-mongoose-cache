@@ -129,7 +129,7 @@ export class CacheClient<
 		type: M,
 		hash: string,
 		key?: K,
-	): Promise<any | null> {
+	): Promise<Models[M][K] | null> {
 		const start = Date.now();
 		return new Promise(async (resolve, reject) => {
 			if (this.modelNames.indexOf(type as string) === -1) {
