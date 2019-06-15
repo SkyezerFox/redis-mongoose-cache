@@ -140,11 +140,11 @@ export class CacheClient<
 				reject("Client is not connected.");
 			}
 			let result = null;
-			
+
 			if (!key) {
-				return this.getAll(type, hash);	
+				return this.getAll(type, hash);
 			}
-			
+
 			if (this.redisStatus) {
 				result = await this.getFromRedis(hash, key as string);
 			}
