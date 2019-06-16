@@ -11,7 +11,7 @@ import {
 	RedisClient,
 } from "redis";
 
-interface CacheClientOptions {
+export interface CacheClientOptions {
 	redisOptions?: RedisClientOptions;
 	mongoURI: string;
 }

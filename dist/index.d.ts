@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import { Model } from "mongoose";
 import { ClientOpts as RedisClientOptions } from "redis";
-interface CacheClientOptions {
+export interface CacheClientOptions {
     redisOptions?: RedisClientOptions;
     mongoURI: string;
 }
@@ -96,7 +96,6 @@ export declare class CacheClient<Models extends {
     private stringify;
     private parse;
 }
-export {};
 /**
  * Emitted when the Cacher is ready
  * @event CacheClient#ready
