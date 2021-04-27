@@ -11,7 +11,7 @@
 	"types": "dist/index.d.ts",
 	"dependencies": {
 		"mongoose": "^5.5.13",
-		"redis": "^2.8.0"
+		"redis": "^3.1.1"
 	},
 	"devDependencies": {
 		"@types/mongoose": "^5.5.5",
