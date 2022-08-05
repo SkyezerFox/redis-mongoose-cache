@@ -10,7 +10,7 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"dependencies": {
-		"mongoose": "^5.5.13",
+		"mongoose": "^5.7.5",
 		"redis": "^2.8.0"
 	},
 	"devDependencies": {
